@@ -192,7 +192,29 @@ class DinoStorage(commands.Cog):
                     return row[0]
                 return None
 
+    async def defer_interaction(self, interaction: nextcord.Interaction):
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True)
+
+    async def send_interaction_message(
+        self,
+        interaction: nextcord.Interaction,
+        *,
+        content: str = None,
+        embed: nextcord.Embed = None,
+        view: nextcord.ui.View = None,
+        ephemeral: bool = True,
+    ):
+        try:
+            if interaction.response.is_done():
+                await interaction.followup.send(content=content, embed=embed, view=view, ephemeral=ephemeral)
+            else:
+                await interaction.response.send_message(content=content, embed=embed, view=view, ephemeral=ephemeral)
+        except nextcord.errors.NotFound:
+            logging.warning("Interaction expired before response could be sent.")
+
     async def save_current_dino(self, interaction: nextcord.Interaction):
+        await self.defer_interaction(interaction)
         discord_id = str(interaction.user.id)
         steam_id = await self.get_linked_steam_id(discord_id)
         if not steam_id:
@@ -201,7 +223,7 @@ class DinoStorage(commands.Cog):
                 description="Du bist nicht verbunden. Nutze den Button **Verbinden**.",
                 color=0xFF0000,
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
             return
 
         src_sav = f"/TheIsle/Saved/PlayerData/{steam_id}.sav"
@@ -216,7 +238,7 @@ class DinoStorage(commands.Cog):
                 description="Du musst im Spiel sein, um deinen Dino zu speichern.",
                 color=0xFF0000,
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
             return
 
         source_exists = await self.async_sftp_operation(self.remote_file_exists, src_sav)
@@ -226,7 +248,7 @@ class DinoStorage(commands.Cog):
                 description="Kein aktiver Dino gefunden. In deiner PlayerData liegt aktuell kein Save.",
                 color=0xFF0000,
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
             return
 
         player_files = await self.async_sftp_operation(self.list_playerdata_files_for_steam, steam_id)
@@ -236,7 +258,7 @@ class DinoStorage(commands.Cog):
                 description="Speichern fehlgeschlagen.",
                 color=0xFF0000,
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
             return
 
         copied_files = []
@@ -250,7 +272,7 @@ class DinoStorage(commands.Cog):
                     description="Speichern fehlgeschlagen. Nicht alle Dino-Dateien konnten gesichert werden.",
                     color=0xFF0000,
                 )
-                await interaction.response.send_message(embed=embed, ephemeral=True)
+                await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
                 return
             copied_files.append(filename)
 
@@ -261,7 +283,7 @@ class DinoStorage(commands.Cog):
                 description="Speichern abgeschlossen, aber /kill konnte nicht ausgefuehrt werden.",
                 color=0xFFA500,
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
             return
 
         delete_failed = False
@@ -280,7 +302,7 @@ class DinoStorage(commands.Cog):
                 ),
                 color=0xFFA500,
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
             return
 
         if LINK_CHANNEL:
@@ -302,7 +324,7 @@ class DinoStorage(commands.Cog):
             ),
             color=0x00FF00,
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
 
     async def list_user_slots(self, discord_id: str):
         base_path = f"/TheIsle/Saved/Garage/{discord_id}"
@@ -324,6 +346,7 @@ class DinoStorage(commands.Cog):
         return slots
 
     async def show_saved_dinos(self, interaction: nextcord.Interaction):
+        await self.defer_interaction(interaction)
         slots = await self.list_user_slots(str(interaction.user.id))
         if not slots:
             embed = nextcord.Embed(
@@ -331,7 +354,7 @@ class DinoStorage(commands.Cog):
                 description="Du hast aktuell keine gespeicherten Dinos.",
                 color=0xFF0000,
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
             return
 
         view = DinoSlotPickerView(self, interaction.user.id, slots)
@@ -340,9 +363,10 @@ class DinoStorage(commands.Cog):
             description="Waehle einen Dino-Slot aus.",
             color=0x5865F2,
         )
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        await self.send_interaction_message(interaction, embed=embed, view=view, ephemeral=True)
 
     async def load_slot_to_playerdata(self, interaction: nextcord.Interaction, slot_path: str, slot_name: str):
+        await self.defer_interaction(interaction)
         discord_id = str(interaction.user.id)
         steam_id = await self.get_linked_steam_id(discord_id)
         if not steam_id:
@@ -351,7 +375,7 @@ class DinoStorage(commands.Cog):
                 description="Du bist nicht verbunden. Nutze den Button **Verbinden**.",
                 color=0xFF0000,
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
             return
 
         in_game = await self.is_player_in_game(steam_id)
@@ -361,7 +385,7 @@ class DinoStorage(commands.Cog):
                 description="Du musst im Spiel sein und deinen Original-Dino ausgewaehlt haben, bevor du laedst.",
                 color=0xFF0000,
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
             return
 
         source_exists = await self.async_sftp_operation(self.remote_file_exists, slot_path)
@@ -371,7 +395,7 @@ class DinoStorage(commands.Cog):
                 description="Der ausgewaehlte Slot existiert nicht mehr.",
                 color=0xFF0000,
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
             return
 
         playerdata_path = f"/TheIsle/Saved/PlayerData/{steam_id}.sav"
@@ -382,7 +406,7 @@ class DinoStorage(commands.Cog):
                 description="Kein Original-Dino gefunden. Waehle zuerst deinen aktuellen Dino im Spiel aus.",
                 color=0xFF0000,
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
             return
 
         current_files = await self.async_sftp_operation(self.list_playerdata_files_for_steam, steam_id)
@@ -392,7 +416,7 @@ class DinoStorage(commands.Cog):
                 description="Aktuelle PlayerData konnte nicht gelesen werden.",
                 color=0xFF0000,
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
             return
 
         for filename in current_files:
@@ -403,7 +427,7 @@ class DinoStorage(commands.Cog):
                     description="Aktuelle PlayerData konnte nicht entfernt werden.",
                     color=0xFF0000,
                 )
-                await interaction.response.send_message(embed=embed, ephemeral=True)
+                await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
                 return
 
         slot_attr_is_dir = await self.async_sftp_operation(
@@ -420,7 +444,7 @@ class DinoStorage(commands.Cog):
                     description="Slot ist leer und kann nicht geladen werden.",
                     color=0xFF0000,
                 )
-                await interaction.response.send_message(embed=embed, ephemeral=True)
+                await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
                 return
 
             for filename in slot_files:
@@ -433,7 +457,7 @@ class DinoStorage(commands.Cog):
                         description="Laden fehlgeschlagen. Slot-Dateien konnten nicht wiederhergestellt werden.",
                         color=0xFF0000,
                     )
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
                     return
                 restored_count += 1
         else:
@@ -444,7 +468,7 @@ class DinoStorage(commands.Cog):
                     description="Laden fehlgeschlagen.",
                     color=0xFF0000,
                 )
-                await interaction.response.send_message(embed=embed, ephemeral=True)
+                await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
                 return
             restored_count = 1
 
@@ -455,7 +479,7 @@ class DinoStorage(commands.Cog):
                 description="Slot geladen, aber /kill konnte nicht ausgefuehrt werden. Bitte reloggen.",
                 color=0xFFA500,
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
             return
 
         embed = nextcord.Embed(
@@ -467,9 +491,10 @@ class DinoStorage(commands.Cog):
             ),
             color=0x00FF00,
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
 
     async def delete_slot(self, interaction: nextcord.Interaction, slot_path: str, slot_name: str):
+        await self.defer_interaction(interaction)
         slot_attr_is_dir = await self.async_sftp_operation(
             lambda sftp, path: stat.S_ISDIR(sftp.stat(path).st_mode),
             slot_path,
@@ -480,7 +505,7 @@ class DinoStorage(commands.Cog):
                 description="Slot konnte nicht geprueft werden.",
                 color=0xFF0000,
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
             return
 
         if slot_attr_is_dir:
@@ -494,7 +519,7 @@ class DinoStorage(commands.Cog):
                 description="Slot konnte nicht geloescht werden.",
                 color=0xFF0000,
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
             return
 
         embed = nextcord.Embed(
@@ -502,7 +527,7 @@ class DinoStorage(commands.Cog):
             description=f"Slot **{slot_name}** wurde geloescht.",
             color=0x00FF00,
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await self.send_interaction_message(interaction, embed=embed, ephemeral=True)
 
     @nextcord.slash_command(description="Open the German dino panel.")
     async def dinopanel(self, interaction: nextcord.Interaction):
