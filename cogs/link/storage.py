@@ -206,10 +206,18 @@ class DinoStorage(commands.Cog):
         ephemeral: bool = True,
     ):
         try:
+            send_kwargs = {"ephemeral": ephemeral}
+            if content is not None:
+                send_kwargs["content"] = content
+            if embed is not None:
+                send_kwargs["embed"] = embed
+            if view is not None:
+                send_kwargs["view"] = view
+
             if interaction.response.is_done():
-                await interaction.followup.send(content=content, embed=embed, view=view, ephemeral=ephemeral)
+                await interaction.followup.send(**send_kwargs)
             else:
-                await interaction.response.send_message(content=content, embed=embed, view=view, ephemeral=ephemeral)
+                await interaction.response.send_message(**send_kwargs)
         except nextcord.errors.NotFound:
             logging.warning("Interaction expired before response could be sent.")
 
