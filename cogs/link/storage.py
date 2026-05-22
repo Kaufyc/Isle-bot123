@@ -34,8 +34,8 @@ class DinoStorage(commands.Cog):
             return None
 
     async def run_rcon_admin_command(self, admin_command: str):
-        # Match the byte-encoded command pattern used by the rcon cog.
-        command = b'\x02' + b'\x14' + admin_command.encode() + b'\x00'
+        # 0x16 is the admin text-command opcode (e.g. kill command string).
+        command = b'\x02' + b'\x16' + admin_command.encode() + b'\x00'
         return await self.run_rcon(command)
 
     async def is_player_in_game(self, steam_id: str):
