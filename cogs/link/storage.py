@@ -34,7 +34,7 @@ class DinoStorage(commands.Cog):
             return None
 
     async def run_rcon_admin_command(self, admin_command: str):
-        # 0x14 is used for plain admin command strings such as /kill <steam_id>.
+        # Match the byte-encoded command pattern used by the rcon cog.
         command = b'\x02' + b'\x14' + admin_command.encode() + b'\x00'
         return await self.run_rcon(command)
 
@@ -46,6 +46,12 @@ class DinoStorage(commands.Cog):
         return steam_id in str(response)
 
     async def kill_dino_with_rcon(self, steam_id: str):
+        # Some setups expect "kill <id>", while others require "/kill <id>".
+        # Try both and accept the first successful response.
+        response = await self.run_rcon_admin_command(f"kill {steam_id}")
+        if response is not None:
+            return True
+
         response = await self.run_rcon_admin_command(f"/kill {steam_id}")
         return response is not None
 
